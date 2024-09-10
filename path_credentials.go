@@ -81,13 +81,13 @@ func (b *exampleBackend) createUserCreds(ctx context.Context, req *logical.Reque
 }
 
 // createToken uses the HashiCups client to sign in and get a new token
-func (b *exampleBackend) createToken(ctx context.Context, s logical.Storage, roleEntry *roleEntry) (*exampleToken, error) {
-	//client, err := b.getClient(ctx, s)
-	//if err != nil {
-	//	return nil, err
-	//}
+func (b *exampleBackend) createToken(ctx context.Context, s logical.Storage, roleEntry *roleEntry) (*token, error) {
+	client, err := b.getClient(ctx, s)
+	if err != nil {
+		return nil, err
+	}
 
-	var token *hashiCupsToken
+	var token *token
 
 	token, err = createToken(ctx, client, roleEntry.Username)
 	if err != nil {

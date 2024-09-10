@@ -24,7 +24,7 @@ type hashiCupsToken struct {
 
 // hashiCupsToken defines a secret to store for a given role
 // and how it should be revoked or renewed.
-func (b *hashiCupsBackend) hashiCupsToken() *framework.Secret {
+func (b *exampleBackend) hashiCupsToken() *framework.Secret {
 	return &framework.Secret{
 		Type: hashiCupsTokenType,
 		Fields: map[string]*framework.FieldSchema{
@@ -39,7 +39,7 @@ func (b *hashiCupsBackend) hashiCupsToken() *framework.Secret {
 }
 
 // tokenRevoke removes the token from the Vault storage API and calls the client to revoke the token
-func (b *hashiCupsBackend) tokenRevoke(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+func (b *exampleBackend) tokenRevoke(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	client, err := b.getClient(ctx, req.Storage)
 	if err != nil {
 		return nil, fmt.Errorf("error getting client: %w", err)
@@ -65,7 +65,7 @@ func (b *hashiCupsBackend) tokenRevoke(ctx context.Context, req *logical.Request
 }
 
 // tokenRenew calls the client to create a new token and stores it in the Vault storage API
-func (b *hashiCupsBackend) tokenRenew(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+func (b *exampleBackend) tokenRenew(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	roleRaw, ok := req.Secret.InternalData["role"]
 	if !ok {
 		return nil, fmt.Errorf("secret is missing role internal data")
@@ -94,8 +94,15 @@ func (b *hashiCupsBackend) tokenRenew(ctx context.Context, req *logical.Request,
 	return resp, nil
 }
 
+type token struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	TokenID  string `json:"token_id"`
+	Token    string `json:"token"`
+}
+
 // createToken calls the HashiCups client to sign in and returns a new token
-func createToken(ctx context.Context, c *hashiCupsClient, username string) (*hashiCupsToken, error) {
+func createToken(ctx context.Context, c *exampleClient, username string) (*token, error) {
 	response, err := c.SignIn()
 	if err != nil {
 		return nil, fmt.Errorf("error creating HashiCups token: %w", err)
@@ -103,7 +110,7 @@ func createToken(ctx context.Context, c *hashiCupsClient, username string) (*has
 
 	tokenID := uuid.New().String()
 
-	return &hashiCupsToken{
+	return &token{
 		UserID:   response.UserID,
 		Username: username,
 		TokenID:  tokenID,
@@ -112,9 +119,9 @@ func createToken(ctx context.Context, c *hashiCupsClient, username string) (*has
 }
 
 // deleteToken calls the HashiCups client to sign out and revoke the token
-func deleteToken(ctx context.Context, c *hashiCupsClient, token string) error {
-	c.Client.Token = token
-	err := c.SignOut()
+func deleteToken(ctx context.Context, c *exampleClient, token string) error {
+	//c.Client.Token = token
+	err := c.SignOut(token)
 
 	if err != nil {
 		return nil

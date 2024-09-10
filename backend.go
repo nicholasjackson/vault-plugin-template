@@ -2,6 +2,7 @@ package example
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -11,7 +12,8 @@ import (
 
 type exampleBackend struct {
 	*framework.Backend
-	lock sync.RWMutex
+	lock   sync.RWMutex
+	client *exampleClient
 }
 
 func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
@@ -60,21 +62,21 @@ func (b *exampleBackend) invalidate(ctx context.Context, key string) {
 
 // getClient locks the backend as it configures and creates a
 // a new client for the target API
-//func (b *exampleBackend) getClient(ctx context.Context, s logical.Storage) (*hashiCupsClient, error) {
-//	b.lock.RLock()
-//	unlockFunc := b.lock.RUnlock
-//	defer func() { unlockFunc() }()
-//
-//	if b.client != nil {
-//		return b.client, nil
-//	}
-//
-//	b.lock.RUnlock()
-//	b.lock.Lock()
-//	unlockFunc = b.lock.Unlock
-//
-//	return nil, fmt.Errorf("need to return client")
-//}
+func (b *exampleBackend) getClient(ctx context.Context, s logical.Storage) (*exampleClient, error) {
+	b.lock.RLock()
+	unlockFunc := b.lock.RUnlock
+	defer func() { unlockFunc() }()
+
+	if b.client != nil {
+		return b.client, nil
+	}
+
+	b.lock.RUnlock()
+	b.lock.Lock()
+	unlockFunc = b.lock.Unlock
+
+	return nil, fmt.Errorf("need to return client")
+}
 
 // backendHelp should contain help information for the backend
 const backendHelp = `
