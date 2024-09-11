@@ -33,7 +33,7 @@ func pathConfig(b *exampleBackend) *framework.Path {
 		Fields: map[string]*framework.FieldSchema{
 			"username": {
 				Type:        framework.TypeString,
-				Description: "The username to access HashiCups Product API",
+				Description: "The username to access the API",
 				Required:    true,
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name:      "Username",
@@ -42,7 +42,7 @@ func pathConfig(b *exampleBackend) *framework.Path {
 			},
 			"password": {
 				Type:        framework.TypeString,
-				Description: "The user's password to access HashiCups Product API",
+				Description: "The password to access the API",
 				Required:    true,
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name:      "Password",
@@ -51,7 +51,7 @@ func pathConfig(b *exampleBackend) *framework.Path {
 			},
 			"url": {
 				Type:        framework.TypeString,
-				Description: "The URL for the HashiCups Product API",
+				Description: "The URL for the API",
 				Required:    true,
 				DisplayAttrs: &framework.DisplayAttributes{
 					Name:      "URL",
@@ -96,6 +96,7 @@ func (b *exampleBackend) pathConfigRead(ctx context.Context, req *logical.Reques
 		return nil, err
 	}
 
+	// note password is not returned in the config output as it is a secret
 	return &logical.Response{
 		Data: map[string]interface{}{
 			"username": config.Username,
@@ -106,39 +107,47 @@ func (b *exampleBackend) pathConfigRead(ctx context.Context, req *logical.Reques
 
 // pathConfigWrite updates the configuration for the backend
 func (b *exampleBackend) pathConfigWrite(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	config, err := getConfig(ctx, req.Storage)
+	c, err := getConfig(ctx, req.Storage)
 	if err != nil {
 		return nil, err
 	}
 
-	createOperation := (req.Operation == logical.CreateOperation)
-
-	if config == nil {
-		if !createOperation {
+	if c == nil {
+		// always require a config except for create operations
+		if req.Operation != logical.CreateOperation {
 			return nil, errors.New("config not found during update operation")
 		}
-		config = new(exampleBackend)
+
+		c = &config{}
 	}
 
-	if username, ok := data.GetOk("username"); ok {
-		config.Username = username.(string)
-	} else if !ok && createOperation {
+	// get values
+	if u, ok := data.GetOk("username"); ok {
+		c.Username = u.(string)
+	}
+
+	if p, ok := data.GetOk("password"); ok {
+		c.Password = p.(string)
+	}
+
+	if u, ok := data.GetOk("url"); ok {
+		c.URL = u.(string)
+	}
+
+	// validate, if creating and any field is missing throw an error
+	if c.Username == "" {
 		return nil, fmt.Errorf("missing username in configuration")
 	}
 
-	if url, ok := data.GetOk("url"); ok {
-		config.URL = url.(string)
-	} else if !ok && createOperation {
-		return nil, fmt.Errorf("missing url in configuration")
-	}
-
-	if password, ok := data.GetOk("password"); ok {
-		config.Password = password.(string)
-	} else if !ok && createOperation {
+	if c.Password == "" {
 		return nil, fmt.Errorf("missing password in configuration")
 	}
 
-	entry, err := logical.StorageEntryJSON(configStoragePath, config)
+	if c.URL == "" {
+		return nil, fmt.Errorf("missing url in configuration")
+	}
+
+	entry, err := logical.StorageEntryJSON(configStoragePath, c)
 	if err != nil {
 		return nil, err
 	}
@@ -184,14 +193,10 @@ func getConfig(ctx context.Context, s logical.Storage) (*config, error) {
 }
 
 // pathConfigHelpSynopsis summarizes the help text for the configuration
-const pathConfigHelpSynopsis = `Configure the HashiCups backend.`
+const pathConfigHelpSynopsis = `Configure the backend.`
 
 // pathConfigHelpDescription describes the help text for the configuration
 const pathConfigHelpDescription = `
-The HashiCups secret backend requires credentials for managing
-JWTs issued to users working with the products API.
-
-You must sign up with a username and password and
-specify the HashiCups address for the products API
-before using this secrets backend.
+The secret backend requires credentials for managing
+tokens with API.
 `

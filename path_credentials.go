@@ -60,7 +60,7 @@ func (b *exampleBackend) createUserCreds(ctx context.Context, req *logical.Reque
 	// The response is divided into two objects (1) internal data and (2) data.
 	// If you want to reference any information in your code, you need to
 	// store it in internal data!
-	resp := b.Secret(hashiCupsTokenType).Response(map[string]interface{}{
+	resp := b.tokenSecret().Response(map[string]interface{}{
 		"token":    token.Token,
 		"token_id": token.TokenID,
 		"user_id":  token.UserID,
@@ -77,36 +77,34 @@ func (b *exampleBackend) createUserCreds(ctx context.Context, req *logical.Reque
 		resp.Secret.MaxTTL = role.MaxTTL
 	}
 
-	return resp, nil
+	//return resp, nil
+	return nil, nil
 }
 
 // createToken uses the HashiCups client to sign in and get a new token
-func (b *exampleBackend) createToken(ctx context.Context, s logical.Storage, roleEntry *roleEntry) (*token, error) {
+func (b *exampleBackend) createToken(ctx context.Context, s logical.Storage, roleEntry *roleEntry) (*tokenData, error) {
 	client, err := b.getClient(ctx, s)
 	if err != nil {
 		return nil, err
 	}
 
-	var token *token
+	var token *tokenData
 
 	token, err = createToken(ctx, client, roleEntry.Username)
 	if err != nil {
-		return nil, fmt.Errorf("error creating HashiCups token: %w", err)
+		return nil, fmt.Errorf("error creating token: %w", err)
 	}
 
 	if token == nil {
-		return nil, errors.New("error creating HashiCups token")
+		return nil, errors.New("error creating token")
 	}
 
 	return token, nil
 }
 
 const pathCredentialsHelpSyn = `
-Generate a HashiCups API token from a specific Vault role.
+Generate a token from a specific Vault role.
 `
 
 const pathCredentialsHelpDesc = `
-This path generates a HashiCups API user tokens
-based on a particular role. A role can only represent a user token,
-since HashiCups doesn't have other types of tokens.
-`
+This path generates tokens based on a particular role.`

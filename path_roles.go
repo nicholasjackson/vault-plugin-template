@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-// hashiCupsRoleEntry defines the data required
+// roleEntry defines the data required
 // for a Vault role to access and call the HashiCups
 // token endpoints
 type roleEntry struct {
@@ -123,40 +123,48 @@ func (b *exampleBackend) pathRolesWrite(ctx context.Context, req *logical.Reques
 		return logical.ErrorResponse("missing role name"), nil
 	}
 
-	roleEntry, err := b.getRole(ctx, req.Storage, name.(string))
+	// fetch the existing role from the storage
+	re, err := b.getRole(ctx, req.Storage, name.(string))
 	if err != nil {
 		return nil, err
 	}
 
-	if roleEntry == nil {
-		roleEntry = &roleEntry{}
+	// non role exists create a blank role
+	if re == nil {
+		re = &roleEntry{}
 	}
 
-	createOperation := (req.Operation == logical.CreateOperation)
-
 	if username, ok := d.GetOk("username"); ok {
-		roleEntry.Username = username.(string)
-	} else if !ok && createOperation {
-		return nil, fmt.Errorf("missing username in role")
+		re.Username = username.(string)
 	}
 
 	if ttlRaw, ok := d.GetOk("ttl"); ok {
-		roleEntry.TTL = time.Duration(ttlRaw.(int)) * time.Second
-	} else if createOperation {
-		roleEntry.TTL = time.Duration(d.Get("ttl").(int)) * time.Second
+		re.TTL = time.Duration(ttlRaw.(int)) * time.Second
 	}
 
 	if maxTTLRaw, ok := d.GetOk("max_ttl"); ok {
-		roleEntry.MaxTTL = time.Duration(maxTTLRaw.(int)) * time.Second
-	} else if createOperation {
-		roleEntry.MaxTTL = time.Duration(d.Get("max_ttl").(int)) * time.Second
+		re.MaxTTL = time.Duration(maxTTLRaw.(int)) * time.Second
 	}
 
-	if roleEntry.MaxTTL != 0 && roleEntry.TTL > roleEntry.MaxTTL {
+	if re.Username == "" {
+		return nil, fmt.Errorf("missing username in role")
+	}
+
+	if re.MaxTTL != 0 && re.TTL > re.MaxTTL {
 		return logical.ErrorResponse("ttl cannot be greater than max_ttl"), nil
 	}
 
-	if err := setRole(ctx, req.Storage, name.(string), roleEntry); err != nil {
+	// save the role
+	entry, err := logical.StorageEntryJSON("role/"+name.(string), re)
+	if err != nil {
+		return nil, err
+	}
+
+	if entry == nil {
+		return nil, fmt.Errorf("failed to create storage entry for role")
+	}
+
+	if err := req.Storage.Put(ctx, entry); err != nil {
 		return nil, err
 	}
 
@@ -171,24 +179,6 @@ func (b *exampleBackend) pathRolesDelete(ctx context.Context, req *logical.Reque
 	}
 
 	return nil, nil
-}
-
-// setRole adds the role to the Vault storage API
-func setRole(ctx context.Context, s logical.Storage, name string, roleEntry *roleEntry) error {
-	entry, err := logical.StorageEntryJSON("role/"+name, roleEntry)
-	if err != nil {
-		return err
-	}
-
-	if entry == nil {
-		return fmt.Errorf("failed to create storage entry for role")
-	}
-
-	if err := s.Put(ctx, entry); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // getRole gets the role from the Vault storage API
@@ -215,12 +205,12 @@ func (b *exampleBackend) getRole(ctx context.Context, s logical.Storage, name st
 }
 
 const (
-	pathRoleHelpSynopsis    = `Manages the Vault role for generating HashiCups tokens.`
+	pathRoleHelpSynopsis    = `Manages the Vault role for generating tokens.`
 	pathRoleHelpDescription = `
-This path allows you to read and write roles used to generate HashiCups tokens.
+This path allows you to read and write roles used to generate tokens.
 You can configure a role to manage a user's token by setting the username field.
 `
 
-	pathRoleListHelpSynopsis    = `List the existing roles in HashiCups backend`
+	pathRoleListHelpSynopsis    = `List the existing roles in backend`
 	pathRoleListHelpDescription = `Roles will be listed by the role name.`
 )

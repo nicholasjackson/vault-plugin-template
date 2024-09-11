@@ -11,26 +11,26 @@ import (
 )
 
 const (
-	hashiCupsTokenType = "hashicups_token"
+	tokenType = "token"
 )
 
-// hashiCupsToken defines a secret for the HashiCups token
-type hashiCupsToken struct {
-	UserID   int    `json:"user_id"`
+// tokenData defines a secret for the token
+type tokenData struct {
+	UserID   string `json:"user_id"`
 	Username string `json:"username"`
 	TokenID  string `json:"token_id"`
 	Token    string `json:"token"`
 }
 
-// hashiCupsToken defines a secret to store for a given role
+// tokenSecret defines a secret to store for a given role
 // and how it should be revoked or renewed.
-func (b *exampleBackend) hashiCupsToken() *framework.Secret {
+func (b *exampleBackend) tokenSecret() *framework.Secret {
 	return &framework.Secret{
-		Type: hashiCupsTokenType,
+		Type: tokenType,
 		Fields: map[string]*framework.FieldSchema{
 			"token": {
 				Type:        framework.TypeString,
-				Description: "HashiCups Token",
+				Description: "Token",
 			},
 		},
 		Revoke: b.tokenRevoke,
@@ -94,15 +94,8 @@ func (b *exampleBackend) tokenRenew(ctx context.Context, req *logical.Request, d
 	return resp, nil
 }
 
-type token struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
-	TokenID  string `json:"token_id"`
-	Token    string `json:"token"`
-}
-
 // createToken calls the HashiCups client to sign in and returns a new token
-func createToken(ctx context.Context, c *exampleClient, username string) (*token, error) {
+func createToken(ctx context.Context, c *exampleClient, username string) (*tokenData, error) {
 	response, err := c.SignIn()
 	if err != nil {
 		return nil, fmt.Errorf("error creating HashiCups token: %w", err)
@@ -110,7 +103,7 @@ func createToken(ctx context.Context, c *exampleClient, username string) (*token
 
 	tokenID := uuid.New().String()
 
-	return &token{
+	return &tokenData{
 		UserID:   response.UserID,
 		Username: username,
 		TokenID:  tokenID,
